@@ -17,6 +17,11 @@ dropped. No queues, no retries, no background ticks.
   Sink failures never break delivery.
 - `core/transport.py` — `Injector` (success = no raise; return ignored) and
   `Prover` (truthy = proven) protocols. No concrete implementations yet.
+- `core/protocol.py` — public message surface: `extract_block` (canonical
+  `[MSG]…[/MSG]`, line-anchored, first block only, fences ignored),
+  `make_id`, `content_hash`, and caller-owned `contains_reserved_marker`.
+  Message contract: plain `{id, body, origin}`. Flow:
+  input → extract_block → message contract → OneShotDelivery.
 - `core/policy.py` — `attempt_once(delivery, text, inject, prove)`: convenience
   policy wiring put → take → inject → prove. A policy, not the abstraction.
 - `core/activity.py` — pure session-activity classifier:
