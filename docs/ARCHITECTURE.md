@@ -19,6 +19,12 @@ dropped. No queues, no retries, no background ticks.
   `Prover` (truthy = proven) protocols. No concrete implementations yet.
 - `core/policy.py` — `attempt_once(delivery, text, inject, prove)`: convenience
   policy wiring put → take → inject → prove. A policy, not the abstraction.
+- `core/activity.py` — pure session-activity classifier:
+  `classify(snapshot, *, now_ms, fresh_s, residual_min_s)` →
+  `waiting | running | completed` with a generic reason. Turn-scoped
+  (pre-turn running is stale), freshness covers text-only output, old running
+  with an idle session is residual (ignored, reported). No I/O, no clock
+  inside, input never mutated.
 - `adapters/` — reserved for real-world integrations (subprocess, HTTP, files).
   Empty until a use case needs one. `core` never imports from `adapters`.
 
