@@ -7,10 +7,12 @@ do with it (e.g. engage SAFETY_HOLD and keep holding it — that persistence is
 the latch; the fuse itself is stateless and re-evaluates the same data the
 same way on every call).
 
-Source contract: a callable returning an iterable of records, each a mapping
-with "at_ms" (epoch ms), "hash" (content id), "confirmed" (bool). Only
-confirmed records count — unconfirmed ones are ignored by the fuse, not by
-trust.
+History contract (deliberately NOT the Source ingestion contract in
+core.source): a callable returning an iterable of delivery records, each a
+mapping with "at_ms" (epoch ms), "hash" (content id), "confirmed" (bool).
+Only confirmed records count — unconfirmed ones are ignored by the fuse, not
+by trust. A content Source (changes/token) is the wrong shape here and will
+fail fast if passed; feed fuses from delivery outcomes, not from content.
 
 Windows are explicit seconds; a record counts when
 (now_ms - at_ms) <= window — mirroring the proven code, which also counts
@@ -22,11 +24,11 @@ from typing import Callable, Iterable, Mapping, Optional
 class Fuses:
     """Three independent fuses, evaluated in order: turns, rate, repetition."""
 
-    def __init__(self, source: Callable[[], Iterable[Mapping]],
+    def __init__(self, history: Callable[[], Iterable[Mapping]],
                  turns_n: int = 12, turns_s: int = 600,
                  rate_n: int = 6, rate_s: int = 60,
                  repeat_n: int = 3):
-        self._source = source
+        self._history = history
         self._turns_n = turns_n
         self._turns_s = turns_s
         self._rate_n = rate_n
@@ -34,7 +36,7 @@ class Fuses:
         self._repeat_n = repeat_n
 
     def _confirmed(self):
-        return [r for r in self._source() if r.get("confirmed")]
+        return [r for r in self._history() if r.get("confirmed")]
 
     @staticmethod
     def _in_window(records, now_ms, window_s):

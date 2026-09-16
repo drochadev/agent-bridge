@@ -11,7 +11,7 @@ def rec(age_s, hash_="h", confirmed=True):
 
 
 def make(records, **kwargs):
-    return Fuses(source=lambda: list(records), **kwargs)
+    return Fuses(history=lambda: list(records), **kwargs)
 
 
 class FusesTest(unittest.TestCase):
