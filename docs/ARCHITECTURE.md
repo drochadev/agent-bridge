@@ -1,7 +1,8 @@
-# ARCHITECTURE — AI Agent Mediator (public core v0.1)
+# ARCHITECTURE — Agent Bridge (ChatGPT Web × OpenCode)
 
-One-shot delivery: one new message → one immediate attempt → delivered or
-dropped. No queues, no retries, no background ticks.
+ChatGPT Web provides the context and coordination. OpenCode provides local
+execution. Agent Bridge connects them: one new message → one immediate
+attempt → delivered or dropped. No queues, no retries, no background ticks.
 
 ## Responsibilities
 

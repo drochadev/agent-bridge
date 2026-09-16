@@ -1,152 +1,129 @@
-# AI Agent Mediator
+# Agent Bridge — ChatGPT Web + OpenCode
 
-A public, generalized implementation of one-shot delivery between two
-independent agents through a mediator. One new message → one immediate
-attempt → delivered or dropped. No queues, no retries, no background ticks.
+**Give ChatGPT hands-on access to your local codebase.**
 
-## Thesis
+Agent Bridge connects ChatGPT Web to OpenCode, allowing ChatGPT's
+conversational context to drive a coding agent running directly on your
+machine.
 
-A local, controlled bridge between **ChatGPT** (rich user/project context,
-coordinating intelligence) and **OpenCode** (local coding agent with
-repository, filesystem and tool access). The generic core in this repo stays
-product-free; the concrete integration lives in `adapters/chatgpt/`,
-`adapters/opencode/` and `extension/`.
+**ChatGPT thinks with you. OpenCode works on your machine. Agent Bridge
+connects them.**
+
+```
+ChatGPT Web → Agent Bridge → OpenCode → Your machine
+```
 
 Independent project. **Not affiliated with or endorsed by OpenAI or the
 OpenCode maintainers.** Product names appear only descriptively, never in
-our own name, branding, or claims.
+our own claims of endorsement.
 
-This is **not** a production framework, SaaS, or deployment-ready distributed
-system. It is a small, readable codebase (stdlib-only Python) extracted and
-generalized from a real working mediator, with 256 tests covering its
-contracts and deterministic behavior — not compatibility with any external
-environment. Concurrency, authentication, distributed deployment and similar
-concerns are explicitly out of v0.1.
+## Why this exists
 
-## The problem it solves
+A ChatGPT conversation holds rich context — the problem discussion, the
+decisions, the corrections — but it cannot touch your local codebase. A
+local coding agent can touch everything but starts each task from a bare
+prompt. Agent Bridge closes that gap: ChatGPT uses the context available in
+the conversation to produce and direct instructions, and the bridge delivers
+them to an OpenCode agent running locally under explicit operational gates.
+To be precise: the system does **not** transfer your personal context
+automatically — it transports the instructions ChatGPT produces from that
+context, with every delivery attempted once, gated, proven, and audited.
 
-Two agents (for example, a web-side assistant and a local coding agent) need
-to exchange messages through an unreliable middle: processes restart,
-responses stream in partially, networks fail, humans pause the system. The
-mediator gives both directions the same guarantees: every message gets
-exactly one immediate attempt; partial content is never silently lost by the
-consumer contract; delivery is never presumed without proof; runaway loops
-trip safety fuses instead of flooding anyone.
+## The idea
 
-## The concept
+ChatGPT Web provides the context and coordination. OpenCode provides local
+execution. Agent Bridge connects them — a controlled, auditable middle that
+gives the coordinator hands without giving it unsupervised control.
+
+## How it works
+
+1. A ChatGPT response stabilizes; the browser companion builds a source
+   envelope (`generating/finished/texts`).
+2. The bridge validates the envelope, waits for a finished response, and
+   extracts the transportable instruction.
+3. `opencode run` executes it in your project directory (`--dir`), and the
+   run's output hash proves what actually arrived.
+4. Session output flows back through a versioned source, a take-once slot,
+   and the companion, which inserts it into the ChatGPT conversation with
+   DOM proof.
+
+## Architecture
+
+- `core/` — product-free rules (delivery slot, gates, state, fuses,
+  lifecycle, protocol, policies, sources). Never imports `adapters/`.
+- `adapters/chatgpt/` + `extension/` — observe ChatGPT Web (configurable
+  selectors; fragile DOM knowledge isolated in config), insert back with
+  proof. Text-only payloads, never executed.
+- `adapters/opencode/` — `opencode run` injector and read-only session
+  source (verified against the installed CLI; internal store, re-verify on
+  upgrade).
+- `adapters/` shared — localhost HTTP slot/observation, subprocess
+  reference transports.
+
+See `docs/ARCHITECTURE.md`, `docs/PROTOCOL.md` and `AGENTS.md`.
+
+## A real request flow
 
 ```
-Agent A  →  Mediator  →  Agent B
-Agent B  →  Mediator  →  Agent A
+ChatGPT answer stabilizes
+  → envelope {generating:false, finished:true, texts:[...]}
+  → finished text → Delivery.put → gate OPEN → attempt
+  → opencode run --dir /your/project "instruction"
+  → stdout hash matches → settle delivered (audit)
 ```
 
-Each agent only ever talks to the mediator, never directly to the other
-agent. The mediator holds at most one pending message per direction, checks
-operational gates before moving anything, and records every outcome in an
-audit sink.
+## Why the architecture is different
 
-## Architecture overview
+Coding agents plugged directly into a chat product execute inside that
+product's environment and trust model. Agent Bridge inverts this: execution
+stays on your machine, inside tools you installed, under gates you can read
+(`open/paused/safety_hold`), with every attempt audited and every proof
+checked independently. These are architectural differences — local,
+gated, and auditable versus hosted and implicit — not a claim of
+superiority and not a claim about what any vendor does or does not offer.
 
-- `core/delivery.py` — single pending slot: `put` / `take` (take-once) /
-  `settle` (single validated close).
-- `core/gate.py`, `core/state.py`, `core/fuses.py`, `core/lifecycle.py`,
-  `core/driver.py` — operational gates, state machine, safety fuses and the
-  explicit per-cycle driver that wires them together.
-- `core/protocol.py` — canonical `[MSG]…[/MSG]` block extraction, ids, hashes.
-- `core/policy.py` — `attempt_once` (push) and `take_attempt` (pull) policies.
-- `core/source.py`, `core/intake.py` — observable sources with
-  processing-position tokens (partial content stays eligible).
-- `core/envelope.py`, `core/stability.py`, `core/activity.py` — source
-  envelope validation, generation-cycle detection, activity classification.
-- `core/audit.py`, `core/transport.py` — audit-sink and injector/prover
-  protocols (interfaces, not implementations).
-- `adapters/` — real-world integrations (never imported by `core`):
-  `http_slot` (localhost JSON slot), `observe` (envelope → finished text),
-  `subprocess_injector` and `stdout_hash_ack` (local reference mechanisms).
+## Safety/control model
 
-See `docs/ARCHITECTURE.md` for responsibilities and `docs/PROTOCOL.md` for
-the official agent protocol.
+One-shot delivery (no retries, no queues); take-once slots; content dedupe;
+gates checked at put AND take; turn/rate/repetition fuses latching to
+`safety_hold`; explicit per-cycle driver with no hidden clocks; proofs
+required from evidence, never from return values; localhost-only HTTP with
+no auth/CORS (the machine is the trust perimeter — never expose it).
 
-## Flows
+## Quick start
 
-**Source → agent** (e.g. web side to local agent): source envelope →
-validate → stability detection → finished text → `attempt_once` (put → take
-→ inject → prove → settle), with the lifecycle gate enforced.
+Requires Python 3.8+ (tested on 3.12), no dependencies. Node.js only for
+the browser-companion JS suites (skipped automatically when absent).
 
-**Agent → source** (e.g. local agent to web side): observable source →
-`Intake` (extract final blocks, `put`) → external consumer collects via
-`take` → confirms via `settle`. Non-final content stays eligible through
-versioned source tokens.
+```bash
+cd agent-bridge
+python3 -m unittest discover -s tests
+node --test tests/chatgpt/observer.test.mjs tests/extension/content.test.cjs
+```
 
-## Key properties
+All 256 Python tests and all 16 JS tests should pass.
 
-- **One-shot delivery** — one attempt per message; failure is an honest
-  `dropped` with a reason, never a silent retry.
-- **Take-once** — collection invalidates the slot; a second take gets nothing.
-- **Dedupe** — sha256 content memory (bounded, FIFO) rejects repeats.
-- **Gates** — checked at `put` AND `take`; closed gates drop with reasons.
-- **Safety fuses** — turn/rate/repetition limits over confirmed deliveries,
-  engaging `SAFETY_HOLD` through the lifecycle.
-- **Lifecycle** — explicit state machine (`stopped/open/paused/safety_hold`)
-  advanced by an explicit per-cycle driver; no hidden clocks.
-- **Proof of delivery** — success requires independent evidence (a `Prover`),
-  never the injector's return value.
-- **Source/intake** — versioned sources; partial items remain eligible until
-  final; token adoption only on clean passes.
+## Limitations
 
-## Repository layout
+- ChatGPT Web DOM is not a stable API: selectors will need updates.
+- OpenCode's session store is internal: re-verify per upgrade.
+- Single slot per direction; no auth (localhost only); no persistence,
+  scheduler, daemon, or panel yet.
+- Tests cover contracts and deterministic behavior, not live products.
+
+## Project structure
 
 ```
 core/       generic rules (no I/O, stdlib only)
-adapters/   real integrations (HTTP, observation, subprocesses)
-tests/      contract tests, stdlib unittest only
+adapters/   chatgpt/ opencode/ (+ HTTP, subprocess references)
+extension/  MV3 browser companion (observe → POST, poll → composer → proof)
+tests/      contract tests (Python unittest) + hermetic JS suites
 docs/       ARCHITECTURE.md, PROTOCOL.md
 ```
 
-## Quickstart
+## Development / AGENTS
 
-Requires Python 3.8+ (tested on 3.12), no dependencies:
-
-```bash
-cd ai-agent-mediator-public
-python3 -m unittest discover -s tests
-```
-
-All 256 tests should pass in a few seconds.
-
-## Conceptual example
-
-```python
-from core.delivery import OneShotDelivery
-from core.gate import ManualGate
-from core.audit import MemoryAuditSink
-from core.policy import attempt_once
-
-delivery = OneShotDelivery(gate=ManualGate(), audit=MemoryAuditSink())
-status, detail = attempt_once(
-    delivery, "hello",
-    inject=lambda item: print("inject:", item["body"]),
-    prove=lambda item: True,
-)
-print(status, detail)  # delivered <id>
-```
-
-## Project status and limitations
-
-- v0.1 scope: in-memory core + localhost/reference adapters. No persistence,
-  no authentication, no multi-slot routing, no scheduler/daemon, no browser
-  or agent-specific integrations.
-- `SubprocessInjector` and `StdoutHashAck` are **local reference mechanisms**,
-  not production transports; HTTP is **localhost-oriented**; some adapters
-  are integration examples.
-- Tests cover contracts and deterministic behavior, not external compatibility.
-
-## Deliberate differences from the private mediator
-
-This codebase generalizes a real private mediator and is not a 1:1 copy:
-agent names and directional tags are replaced by the generic `[MSG]` block;
-private infrastructure (window automation, browser extension, chat-service
-schemas, local databases, operator tooling) is replaced by protocols and
-reference adapters; the audit emits `delivered`/`superseded` events the
-private log lacks; safety thresholds are parameters, not hard-coded values.
-Behavioral parity is documented per component, not assumed globally.
+Coding agents working here must read `AGENTS.md` first: thesis,
+boundaries, environment-dependent parts, validation, and prohibitions
+(no commits/pushes/renames without explicit orders, no secrets, no
+production claims beyond what tests demonstrate).

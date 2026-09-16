@@ -1,4 +1,4 @@
-# AGENTS.md — working agreement for coding agents
+# AGENTS.md — Agent Bridge working agreement for coding agents
 
 ## Goal
 
