@@ -36,6 +36,9 @@ dropped. No queues, no retries, no background ticks.
 - `core/driver.py` — one explicit cycle: `run_once(now_ms)` advances the
   lifecycle exactly once. No loops, threads, sleep, or I/O; seam for future
   schedulers.
+- `core/watcher.py` — one poll cycle over any `Source`: `Watcher(source,
+  deliver)` + `poll()->[{id,version,disposition}]`, composing `Intake`
+  (token held privately, no rule duplication, failures keep the token).
 - `core/intake.py` — agent-to-Web intake: `Intake(source, deliver)` +
   `process()->[{id,version,disposition}]` over `skipped/no-message/
   invalid-message/accepted/rejected`. Token adopted only on a clean pass;
@@ -61,15 +64,31 @@ dropped. No queues, no retries, no background ticks.
   with an idle session is residual (ignored, reported). No I/O, no clock
   inside, input never mutated.
 - `adapters/` — real-world integrations. `http_slot` (single global slot)
-  is a thin JSON skin over `OneShotDelivery`. `observe` (`ObservationFeed`)
+  is a thin JSON skin over `OneShotDelivery`. `http_observe` (`POST
+  /observe`) validates envelopes into an `ObservationFeed` — observation and
+  delivery stay separate endpoints. `observe` (`ObservationFeed`)
   composes `validate` + `StabilityDetector`: envelope → finished text, with
-  no transport and no I/O. `subprocess_injector` (`SubprocessInjector`):
+  no transport and no I/O. `chatgpt/` (`observer.js` + `selectors.js`):
+  generic DOM-observation mechanism (configurable selectors, hash-stability
+  finished detection) producing source envelopes; fragile product knowledge
+  lives only in config, tested hermetically without a browser.
+  `extension/` (MV3, `content.js`): browser twin — observe→`POST /observe`
+  (signature dedupe, honest failures), poll `GET /slot/take`, isolated
+  composer insert+send, DOM proof, `POST /slot/confirm`. Text-only payloads,
+  never executed. `subprocess_injector` (`SubprocessInjector`):
   argv-only stdin delivery, one process per attempt, EPIPE absorbed by
   stdlib (proof stays with Prover). `stdout_hash_ack` (`StdoutHashAck`):
   dual-role injector+prover over one process run — inject captures stdout
   keyed by id, `prove` matches the sent-bytes SHA-256 (use as
-  `prove=ack.prove`). HTTP/observation/injection are adapters,
+  `prove=ack.prove`). `opencode/` (`OpencodeRunInjector`): message as a
+  single `opencode run` argv element (+`--dir/--model/--session`), reusing
+  core protocols only. HTTP/observation/injection are adapters,
   never core:
+- `opencode/` (`OpencodeRunInjector`): message as a single `opencode run`
+  argv element (+`--dir/--model/--session`), reusing core protocols only.
+  `session_source` (`SessionSource`): read-only `Source` over a session
+  database — id = assistant message id, final = step-finish present, text =
+  text parts joined; internal store, verify version per OpenCode upgrade.
 
 ```
 HTTP adapter  →  OneShotDelivery  →  slot lifecycle

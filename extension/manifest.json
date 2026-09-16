@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Agent Bridge — ChatGPT companion (unofficial)",
+  "version": "0.1.0",
+  "description": "Observes stabilized ChatGPT responses into a local mediator and delivers mediator messages back into the composer. Independent project, not affiliated with or endorsed by OpenAI. Localhost only.",
+  "permissions": [],
+  "host_permissions": ["http://127.0.0.1:18765/*", "http://127.0.0.1:18766/*"],
+  "content_scripts": [
+    {
+      "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}

@@ -4,9 +4,21 @@ A public, generalized implementation of one-shot delivery between two
 independent agents through a mediator. One new message → one immediate
 attempt → delivered or dropped. No queues, no retries, no background ticks.
 
+## Thesis
+
+A local, controlled bridge between **ChatGPT** (rich user/project context,
+coordinating intelligence) and **OpenCode** (local coding agent with
+repository, filesystem and tool access). The generic core in this repo stays
+product-free; the concrete integration lives in `adapters/chatgpt/`,
+`adapters/opencode/` and `extension/`.
+
+Independent project. **Not affiliated with or endorsed by OpenAI or the
+OpenCode maintainers.** Product names appear only descriptively, never in
+our own name, branding, or claims.
+
 This is **not** a production framework, SaaS, or deployment-ready distributed
 system. It is a small, readable codebase (stdlib-only Python) extracted and
-generalized from a real working mediator, with 217 tests covering its
+generalized from a real working mediator, with 256 tests covering its
 contracts and deterministic behavior — not compatibility with any external
 environment. Concurrency, authentication, distributed deployment and similar
 concerns are explicitly out of v0.1.
@@ -100,7 +112,7 @@ cd ai-agent-mediator-public
 python3 -m unittest discover -s tests
 ```
 
-All 217 tests should pass in a few seconds.
+All 256 tests should pass in a few seconds.
 
 ## Conceptual example
 
