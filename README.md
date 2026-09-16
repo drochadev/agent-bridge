@@ -13,6 +13,10 @@ connects them.**
 ChatGPT Web → Agent Bridge → OpenCode → Your machine
 ```
 
+![Agent Bridge: ChatGPT Web on the left (chat content hidden for privacy) and OpenCode on the right running real Agent Bridge code](docs/images/chatgpt-opencode-agent-bridge.png)
+
+*Sanitized capture of the bridge in action (v0.1): ChatGPT Web conversation content hidden for privacy; OpenCode terminal showing real Agent Bridge code.*
+
 Independent project. **Not affiliated with or endorsed by OpenAI or the
 OpenCode maintainers.** Product names appear only descriptively, never in
 our own claims of endorsement.
